@@ -16,11 +16,30 @@ for pid, prefix in [[1, "buff"], [2, "yyyp"]]:
 TOKENS = [t.strip() for t in os.environ.get("CSQAQ_TOKENS", "").split(",") if t.strip()]
 
 
+def bind_with_retry(token, max_retries=3):
+    """bind_local_ip，429频率限制时等待30s重试"""
+    for attempt in range(max_retries + 1):
+        r = requests.post(f"{API}/api/v1/sys/bind_local_ip", headers=HDR(token)).json()
+        code = r.get("code")
+        if code == 200:
+            return r
+        if code == 429:
+            if attempt < max_retries:
+                print(f"  bind 429频率限制, 30s后重试 ({attempt+1}/{max_retries})...")
+                time.sleep(30)
+                continue
+            else:
+                print(f"  bind 429频率限制, 已达最大重试次数")
+                return r
+        return r
+    return r
+
+
 def collect_item(text, token, goods_id=None):
     print(f"采集: {text}, token={token[:8]}...")
 
     print(f"[1/3] bind...")
-    bind_r = requests.post(f"{API}/api/v1/sys/bind_local_ip", headers=HDR(token)).json()
+    bind_r = bind_with_retry(token)
     print(f"  bind: code={bind_r.get('code')}")
     if bind_r.get("code") != 200:
         print(f"  bind失败: {bind_r}")
