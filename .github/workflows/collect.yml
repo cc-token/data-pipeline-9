@@ -4,11 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       text:
-        description: '饰品名称'
+        description: '单 item 饰品名称（兼容模式）'
         required: false
         default: ''
       goods_id:
-        description: '饰品ID（有则跳过search）'
+        description: '单 item 饰品ID'
+        required: false
+        default: ''
+      items_json:
+        description: '批量 JSON 数组 [{"name":"...","goods_id":"..."}]'
         required: false
         default: ''
       token_index:
@@ -19,7 +23,7 @@ on:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
       - uses: actions/checkout@v4
@@ -37,8 +41,16 @@ jobs:
           CSQAQ_TOKENS: ${{ secrets.CSQAQ_TOKENS }}
           INPUT_TEXT: ${{ github.event.inputs.text }}
           INPUT_GOODS_ID: ${{ github.event.inputs.goods_id }}
+          INPUT_ITEMS_JSON: ${{ github.event.inputs.items_json }}
           INPUT_TOKEN_INDEX: ${{ github.event.inputs.token_index }}
-        run: python collect.py --text "$INPUT_TEXT" --goods-id "$INPUT_GOODS_ID" --token-index "$INPUT_TOKEN_INDEX"
+        run: |
+          if [ -n "$INPUT_ITEMS_JSON" ]; then
+            echo "Batch mode K>1, items_json length: ${#INPUT_ITEMS_JSON}"
+            python collect.py --items-json "$INPUT_ITEMS_JSON" --token-index "$INPUT_TOKEN_INDEX"
+          else
+            echo "Single mode (legacy), text=$INPUT_TEXT, goods_id=$INPUT_GOODS_ID"
+            python collect.py --text "$INPUT_TEXT" --goods-id "$INPUT_GOODS_ID" --token-index "$INPUT_TOKEN_INDEX"
+          fi
 
       - name: Upload result
         uses: actions/upload-artifact@v4
